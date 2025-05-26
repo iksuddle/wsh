@@ -1,5 +1,7 @@
 use std::io::{self, Write};
 
+mod commands;
+
 fn main() {
     let prompt = "> ";
 
@@ -7,7 +9,7 @@ fn main() {
 
     loop {
         print!("{}", prompt);
-        io::stdout().flush().unwrap();
+        io::stdout().flush().expect("error flushing stdout");
 
         input.clear();
         io::stdin()
@@ -23,13 +25,15 @@ fn main() {
 }
 
 fn process_input<'a>(mut input: impl Iterator<Item = &'a str>) -> bool {
-    let Some(token) = input.next() else {
+    let Some(cmd) = input.next() else {
         return false;
     };
 
-    if token == "exit" {
-        return false;
-    }
+    match cmd {
+        "exit" => return false,
+        "echo" => commands::echo(input),
+        _ => println!("command not found"),
+    };
 
     true
 }
