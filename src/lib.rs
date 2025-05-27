@@ -4,13 +4,15 @@ use std::{
     io::{self, Write},
 };
 
+use std::process;
+use std::process::Stdio;
+
 #[derive(Debug)]
 enum Cmd {
     Exit,
-    Echo(Vec<String>),
     SetVar(String, String),
     ListVars,
-    Unknown(String),
+    External(String, Vec<String>),
 }
 
 pub struct Shell {
@@ -37,10 +39,25 @@ impl Shell {
         for cmd in cmds {
             match cmd {
                 Cmd::Exit => return false,
-                Cmd::Echo(args) => echo(args),
                 Cmd::SetVar(k, v) => _ = self.env_vars.insert(k, v),
                 Cmd::ListVars => self.list_vars(),
-                Cmd::Unknown(cmd) => println!("command not found: {}", cmd),
+                Cmd::External(name, args) => {
+                    let status = process::Command::new(&name)
+                        .args(args)
+                        .stdin(Stdio::inherit())
+                        .stdout(Stdio::inherit())
+                        .stderr(Stdio::inherit())
+                        .status();
+
+                    match status {
+                        Ok(s) => {
+                            if !s.success() {
+                                println!("{} exited with code {}", name, s);
+                            }
+                        }
+                        Err(_) => println!("command not found: {}", name),
+                    };
+                }
             };
         }
 
@@ -107,20 +124,14 @@ fn process_input<'a>(mut input: impl Iterator<Item = &'a str>) -> Vec<Cmd> {
         if let Some((k, v)) = token.split_once("=") {
             cmds.push(Cmd::SetVar(k.to_owned(), v.to_owned()));
         } else {
-            let cmd = match token {
+            cmds.push(match token {
                 "exit" => Cmd::Exit,
-                "echo" => Cmd::Echo(input.map(|s| s.to_owned()).collect()),
                 "lsv" => Cmd::ListVars,
-                _ => Cmd::Unknown(token.to_owned()),
-            };
-            cmds.push(cmd);
+                _ => Cmd::External(token.to_owned(), input.map(|s| s.to_owned()).collect()),
+            });
             break;
         }
     }
 
     cmds
-}
-
-fn echo(args: Vec<String>) {
-    println!("{}", args.join(" "));
 }
