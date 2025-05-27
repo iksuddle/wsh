@@ -6,10 +6,10 @@ use std::{
 
 #[derive(Debug)]
 enum Cmd {
-    ListVars,
-    SetVar(String, String),
-    Echo(Vec<String>),
     Exit,
+    Echo(Vec<String>),
+    SetVar(String, String),
+    ListVars,
     Unknown(String),
 }
 
@@ -19,7 +19,7 @@ pub struct Shell {
 }
 
 impl Shell {
-    pub fn build(prompt: String) -> Shell {
+    pub fn new(prompt: String) -> Shell {
         Shell {
             prompt,
             env_vars: HashMap::new(),
@@ -27,13 +27,10 @@ impl Shell {
     }
 
     fn list_vars(&self) {
+        println!("{} items:", self.env_vars.len());
         for (k, v) in &self.env_vars {
-            println!("{}: {}", k, v);
+            println!("{k}: {v}");
         }
-    }
-
-    fn set_var(&mut self, key: String, val: String) {
-        self.env_vars.insert(key, val);
     }
 
     fn execute(&mut self, cmds: Vec<Cmd>) -> bool {
@@ -41,7 +38,7 @@ impl Shell {
             match cmd {
                 Cmd::Exit => return false,
                 Cmd::Echo(args) => echo(args),
-                Cmd::SetVar(k, v) => self.set_var(k, v),
+                Cmd::SetVar(k, v) => _ = self.env_vars.insert(k, v),
                 Cmd::ListVars => self.list_vars(),
                 Cmd::Unknown(cmd) => println!("command not found: {}", cmd),
             };
@@ -49,27 +46,59 @@ impl Shell {
 
         true
     }
-}
 
-pub fn run(mut shell: Shell) -> Result<(), Box<dyn Error>> {
-    let mut input = String::new();
+    pub fn run(&mut self) -> Result<(), Box<dyn Error>> {
+        let mut input = String::new();
 
-    loop {
-        print!("{}", shell.prompt);
-        io::stdout().flush()?;
+        loop {
+            print!("{}", self.prompt);
+            io::stdout().flush()?;
 
-        input.clear();
-        io::stdin().read_line(&mut input)?;
+            input.clear();
+            io::stdin().read_line(&mut input)?;
 
-        let input = input.trim().split_whitespace();
+            input = self.expand(&input);
 
-        let cmds = process_input(input);
-        if !shell.execute(cmds) {
-            break;
+            let tokens = input.split_whitespace();
+
+            let cmds = process_input(tokens);
+            if !self.execute(cmds) {
+                break;
+            }
         }
+
+        Ok(())
     }
 
-    Ok(())
+    fn expand(&self, input: &str) -> String {
+        let mut result = String::new();
+        let mut chars = input.chars().peekable();
+
+        while let Some(c) = chars.next() {
+            if c == '$' {
+                let mut var_name = String::new();
+
+                while let Some(&next) = chars.peek() {
+                    if next.is_whitespace() || "=$".contains(next) {
+                        break;
+                    }
+                    var_name.push(next);
+                    chars.next();
+                }
+
+                if let Some(v) = self.env_vars.get(&var_name) {
+                    result.push_str(v);
+                } else {
+                    result.push('$');
+                    result.push_str(&var_name);
+                }
+            } else {
+                result.push(c)
+            }
+        }
+
+        result
+    }
 }
 
 fn process_input<'a>(mut input: impl Iterator<Item = &'a str>) -> Vec<Cmd> {
@@ -78,12 +107,13 @@ fn process_input<'a>(mut input: impl Iterator<Item = &'a str>) -> Vec<Cmd> {
         if let Some((k, v)) = token.split_once("=") {
             cmds.push(Cmd::SetVar(k.to_owned(), v.to_owned()));
         } else {
-            match token {
-                "exit" => cmds.push(Cmd::Exit),
-                "echo" => cmds.push(Cmd::Echo(input.map(|s| s.to_owned()).collect())),
-                "listvars" => cmds.push(Cmd::ListVars),
-                _ => cmds.push(Cmd::Unknown(token.to_owned())),
-            }
+            let cmd = match token {
+                "exit" => Cmd::Exit,
+                "echo" => Cmd::Echo(input.map(|s| s.to_owned()).collect()),
+                "lsv" => Cmd::ListVars,
+                _ => Cmd::Unknown(token.to_owned()),
+            };
+            cmds.push(cmd);
             break;
         }
     }
@@ -91,14 +121,6 @@ fn process_input<'a>(mut input: impl Iterator<Item = &'a str>) -> Vec<Cmd> {
     cmds
 }
 
-fn echo<'a>(mut args: Vec<String>) {
-    let mut args_iter = args.iter_mut();
-
-    if let Some(first) = args_iter.next() {
-        print!("{}", first);
-        for arg in args_iter {
-            print!(" {}", arg);
-        }
-    }
-    println!();
+fn echo(args: Vec<String>) {
+    println!("{}", args.join(" "));
 }
