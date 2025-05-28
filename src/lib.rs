@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    env,
     error::Error,
     io::{self, Write},
 };
@@ -10,6 +11,8 @@ use std::process::Stdio;
 #[derive(Debug)]
 enum Cmd {
     Exit,
+    Cd(Vec<String>),
+    Pwd(Vec<String>),
     SetVar(String, String),
     ListVars,
     External(String, Vec<String>),
@@ -26,42 +29,6 @@ impl Shell {
             prompt,
             env_vars: HashMap::new(),
         }
-    }
-
-    fn list_vars(&self) {
-        println!("{} items:", self.env_vars.len());
-        for (k, v) in &self.env_vars {
-            println!("{k}: {v}");
-        }
-    }
-
-    fn execute(&mut self, cmds: Vec<Cmd>) -> bool {
-        for cmd in cmds {
-            match cmd {
-                Cmd::Exit => return false,
-                Cmd::SetVar(k, v) => _ = self.env_vars.insert(k, v),
-                Cmd::ListVars => self.list_vars(),
-                Cmd::External(name, args) => {
-                    let status = process::Command::new(&name)
-                        .args(args)
-                        .stdin(Stdio::inherit())
-                        .stdout(Stdio::inherit())
-                        .stderr(Stdio::inherit())
-                        .status();
-
-                    match status {
-                        Ok(s) => {
-                            if !s.success() {
-                                println!("{} exited with code {}", name, s);
-                            }
-                        }
-                        Err(_) => println!("command not found: {}", name),
-                    };
-                }
-            };
-        }
-
-        true
     }
 
     pub fn run(&mut self) -> Result<(), Box<dyn Error>> {
@@ -85,6 +52,37 @@ impl Shell {
         }
 
         Ok(())
+    }
+
+    fn execute(&mut self, cmds: Vec<Cmd>) -> bool {
+        for cmd in cmds {
+            match cmd {
+                Cmd::Exit => return false,
+                Cmd::Cd(args) => cd(args),
+                Cmd::Pwd(args) => pwd(args),
+                Cmd::SetVar(k, v) => _ = self.env_vars.insert(k, v),
+                Cmd::ListVars => self.list_vars(),
+                Cmd::External(name, args) => {
+                    let status = process::Command::new(&name)
+                        .args(args)
+                        .stdin(Stdio::inherit())
+                        .stdout(Stdio::inherit())
+                        .stderr(Stdio::inherit())
+                        .status();
+
+                    match status {
+                        Ok(s) => {
+                            if !s.success() {
+                                println!("{} exited with code {}", name, s);
+                            }
+                        }
+                        Err(_) => println!("command not found: {}", name),
+                    };
+                }
+            };
+        }
+
+        true
     }
 
     fn expand(&self, input: &str) -> String {
@@ -116,6 +114,13 @@ impl Shell {
 
         result
     }
+
+    fn list_vars(&self) {
+        println!("{} items:", self.env_vars.len());
+        for (k, v) in &self.env_vars {
+            println!("{k}: {v}");
+        }
+    }
 }
 
 fn process_input<'a>(mut input: impl Iterator<Item = &'a str>) -> Vec<Cmd> {
@@ -124,14 +129,56 @@ fn process_input<'a>(mut input: impl Iterator<Item = &'a str>) -> Vec<Cmd> {
         if let Some((k, v)) = token.split_once("=") {
             cmds.push(Cmd::SetVar(k.to_owned(), v.to_owned()));
         } else {
+            let args: Vec<String> = input.map(|s| s.to_owned()).collect();
+
             cmds.push(match token {
                 "exit" => Cmd::Exit,
                 "lsv" => Cmd::ListVars,
-                _ => Cmd::External(token.to_owned(), input.map(|s| s.to_owned()).collect()),
+                "cd" => Cmd::Cd(args),
+                "pwd" => Cmd::Pwd(args),
+                _ => Cmd::External(token.to_owned(), args),
             });
+
             break;
         }
     }
 
     cmds
+}
+
+fn cd(args: Vec<String>) {
+    match args.len() {
+        0 => {
+            if let Some(home) = env::var_os("HOME") {
+                if let Err(e) = env::set_current_dir(home) {
+                    println!("cd: operation failed: {}", e);
+                }
+            } else {
+                println!("cd: HOME not set");
+            }
+        }
+        1 => {
+            if let Err(e) = env::set_current_dir(args.first().unwrap()) {
+                println!("cd: operation failed: {}", e);
+            }
+        }
+        _ => println!("cd: too many arguments"),
+    };
+}
+
+fn pwd(args: Vec<String>) {
+    match args.len() {
+        0 => {
+            let curr_dir = match env::current_dir() {
+                Ok(dir) => dir,
+                Err(e) => {
+                    println!("pwd: {}", e);
+                    return;
+                }
+            };
+
+            println!("{}", curr_dir.display());
+        }
+        _ => println!("pwd: too many arguments"),
+    }
 }
