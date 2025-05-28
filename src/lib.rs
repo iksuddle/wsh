@@ -4,8 +4,7 @@ use std::{
     io::{self, Write, stdout},
 };
 
-use std::process;
-use std::process::Stdio;
+use std::process::{self, Stdio};
 
 mod commands;
 
@@ -37,7 +36,7 @@ impl Shell {
         let prompt = self.prompt.clone();
         ctrlc::set_handler(move || {
             print!("\n{}", prompt);
-            stdout().flush().expect("error flushing stdout");
+            stdout().flush().ok();
         })?;
 
         let mut input = String::new();
@@ -46,13 +45,18 @@ impl Shell {
             io::stdout().flush()?;
 
             input.clear();
-            io::stdin().read_line(&mut input)?;
+            if io::stdin().read_line(&mut input)? == 0 {
+                // 0 bytes read => ctrl+d
+                println!();
+                break;
+            }
 
-            input = self.expand(&input);
+            let input = self.expand(&input);
 
             let tokens = input.split_whitespace();
 
             let cmds = process_input(tokens);
+
             if !self.execute(cmds) {
                 break;
             }
@@ -67,7 +71,9 @@ impl Shell {
                 Cmd::Exit => return false,
                 Cmd::Cd(args) => commands::cd(args),
                 Cmd::Pwd(args) => commands::pwd(args),
-                Cmd::SetVar(k, v) => _ = self.env_vars.insert(k, v),
+                Cmd::SetVar(k, v) => {
+                    self.env_vars.insert(k, v);
+                }
                 Cmd::ListVars => self.list_vars(),
                 Cmd::External(name, args) => {
                     let status = process::Command::new(&name)
