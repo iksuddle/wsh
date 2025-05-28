@@ -42,7 +42,7 @@ impl Shell {
         let mut input = String::new();
         loop {
             print!("{}", self.prompt);
-            io::stdout().flush()?;
+            stdout().flush()?;
 
             input.clear();
             if io::stdin().read_line(&mut input)? == 0 {
@@ -52,7 +52,6 @@ impl Shell {
             }
 
             let input = self.expand(&input);
-
             let tokens = input.split_whitespace();
 
             let cmds = process_input(tokens);
