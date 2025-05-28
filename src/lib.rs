@@ -1,12 +1,13 @@
 use std::{
     collections::HashMap,
-    env,
     error::Error,
-    io::{self, Write},
+    io::{self, Write, stdout},
 };
 
 use std::process;
 use std::process::Stdio;
+
+mod commands;
 
 #[derive(Debug)]
 enum Cmd {
@@ -32,8 +33,14 @@ impl Shell {
     }
 
     pub fn run(&mut self) -> Result<(), Box<dyn Error>> {
-        let mut input = String::new();
+        // ignore ctrl+c
+        let prompt = self.prompt.clone();
+        ctrlc::set_handler(move || {
+            print!("\n{}", prompt);
+            stdout().flush().expect("error flushing stdout");
+        })?;
 
+        let mut input = String::new();
         loop {
             print!("{}", self.prompt);
             io::stdout().flush()?;
@@ -58,8 +65,8 @@ impl Shell {
         for cmd in cmds {
             match cmd {
                 Cmd::Exit => return false,
-                Cmd::Cd(args) => cd(args),
-                Cmd::Pwd(args) => pwd(args),
+                Cmd::Cd(args) => commands::cd(args),
+                Cmd::Pwd(args) => commands::pwd(args),
                 Cmd::SetVar(k, v) => _ = self.env_vars.insert(k, v),
                 Cmd::ListVars => self.list_vars(),
                 Cmd::External(name, args) => {
@@ -144,41 +151,4 @@ fn process_input<'a>(mut input: impl Iterator<Item = &'a str>) -> Vec<Cmd> {
     }
 
     cmds
-}
-
-fn cd(args: Vec<String>) {
-    match args.len() {
-        0 => {
-            if let Some(home) = env::var_os("HOME") {
-                if let Err(e) = env::set_current_dir(home) {
-                    println!("cd: operation failed: {}", e);
-                }
-            } else {
-                println!("cd: HOME not set");
-            }
-        }
-        1 => {
-            if let Err(e) = env::set_current_dir(args.first().unwrap()) {
-                println!("cd: operation failed: {}", e);
-            }
-        }
-        _ => println!("cd: too many arguments"),
-    };
-}
-
-fn pwd(args: Vec<String>) {
-    match args.len() {
-        0 => {
-            let curr_dir = match env::current_dir() {
-                Ok(dir) => dir,
-                Err(e) => {
-                    println!("pwd: {}", e);
-                    return;
-                }
-            };
-
-            println!("{}", curr_dir.display());
-        }
-        _ => println!("pwd: too many arguments"),
-    }
 }
