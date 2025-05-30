@@ -2,9 +2,8 @@ use std::{
     collections::HashMap,
     error::Error,
     io::{self, Write, stdout},
+    process,
 };
-
-use std::process::{self, Stdio};
 
 mod commands;
 
@@ -14,6 +13,7 @@ enum Cmd {
     Cd(Vec<String>),
     Pwd(Vec<String>),
     SetVar(String, String),
+    GetVar(Vec<String>),
     ListVars,
     External(String, Vec<String>),
 }
@@ -73,28 +73,26 @@ impl Shell {
                 Cmd::SetVar(k, v) => {
                     self.env_vars.insert(k, v);
                 }
+                Cmd::GetVar(name) => self.get_var(name),
                 Cmd::ListVars => self.list_vars(),
-                Cmd::External(name, args) => {
-                    let status = process::Command::new(&name)
-                        .args(args)
-                        .stdin(Stdio::inherit())
-                        .stdout(Stdio::inherit())
-                        .stderr(Stdio::inherit())
-                        .status();
-
-                    match status {
-                        Ok(s) => {
-                            if !s.success() {
-                                println!("{} exited with code {}", name, s);
-                            }
-                        }
-                        Err(_) => println!("command not found: {}", name),
-                    };
-                }
+                Cmd::External(name, args) => self.execute_external(name, args),
             };
         }
 
         true
+    }
+
+    fn execute_external(&self, name: String, args: Vec<String>) {
+        let status = process::Command::new(&name).args(args).status();
+
+        match status {
+            Ok(s) => {
+                if !s.success() {
+                    println!("{} exited with code {}", name, s);
+                }
+            }
+            Err(_) => println!("command not found: {}", name),
+        };
     }
 
     fn expand(&self, input: &str) -> String {
@@ -127,6 +125,20 @@ impl Shell {
         result
     }
 
+    fn get_var(&self, args: Vec<String>) {
+        match args.len() {
+            0 => println!("cd: expected key"),
+            1 => {
+                let key = args.first().unwrap();
+                match self.env_vars.get(key) {
+                    Some(val) => println!("{}", val),
+                    None => println!("cd: key '{}' not found", key),
+                }
+            }
+            _ => print!("cd: too many arguments"),
+        }
+    }
+
     fn list_vars(&self) {
         println!("{} items:", self.env_vars.len());
         for (k, v) in &self.env_vars {
@@ -136,7 +148,7 @@ impl Shell {
 }
 
 fn process_input<'a>(mut input: impl Iterator<Item = &'a str>) -> Vec<Cmd> {
-    let mut cmds = Vec::new();
+    let mut cmds = vec![];
     while let Some(token) = input.next() {
         if let Some((k, v)) = token.split_once("=") {
             cmds.push(Cmd::SetVar(k.to_owned(), v.to_owned()));
@@ -145,6 +157,7 @@ fn process_input<'a>(mut input: impl Iterator<Item = &'a str>) -> Vec<Cmd> {
 
             cmds.push(match token {
                 "exit" => Cmd::Exit,
+                "get" => Cmd::GetVar(args),
                 "lsv" => Cmd::ListVars,
                 "cd" => Cmd::Cd(args),
                 "pwd" => Cmd::Pwd(args),
