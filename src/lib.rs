@@ -190,8 +190,8 @@ fn process_input<'a>(input: impl Iterator<Item = &'a str>) -> Vec<Cmd> {
 }
 
 // todo: fix this function
-//   - all Cmds are Cmd::External
-//   - does not account for syntax errors
+//   - all Cmds shouldn't be Cmd::External
+//   - does not account for syntax errors like `foo | | bar`
 fn build_piped_commands(cmd: Vec<String>) -> Vec<Cmd> {
     let mut cmds = vec![];
     let mut curr_cmd = vec![];
@@ -213,12 +213,3 @@ fn build_piped_commands(cmd: Vec<String>) -> Vec<Cmd> {
 
     cmds
 }
-
-// cmds.push(match token.as_str() {
-//     "exit" => Cmd::Exit,
-//     "get" => Cmd::GetVar(args),
-//     "lsv" => Cmd::ListVars,
-//     "cd" => Cmd::Cd(args),
-//     "pwd" => Cmd::Pwd(args),
-//     _ => Cmd::External(*token, args),
-// });
