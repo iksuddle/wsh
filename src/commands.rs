@@ -1,6 +1,6 @@
 use std::env;
 
-pub fn cd(args: Vec<String>) {
+pub fn cd(args: &[String]) {
     match args.len() {
         0 => {
             if let Some(home) = env::var_os("HOME") {
@@ -20,7 +20,7 @@ pub fn cd(args: Vec<String>) {
     };
 }
 
-pub fn pwd(args: Vec<String>) {
+pub fn pwd(args: &[String]) {
     match args.len() {
         0 => {
             let curr_dir = match env::current_dir() {

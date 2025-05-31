@@ -2,7 +2,8 @@ use std::{
     collections::HashMap,
     error::Error,
     io::{self, Write, stdout},
-    process,
+    process::{ChildStdout, Command, Stdio},
+    vec,
 };
 
 mod commands;
@@ -15,7 +16,7 @@ enum Cmd {
     SetVar(String, String),
     GetVar(Vec<String>),
     ListVars,
-    External(String, Vec<String>),
+    External(Vec<String>),
 }
 
 pub struct Shell {
@@ -65,34 +66,59 @@ impl Shell {
     }
 
     fn execute(&mut self, cmds: Vec<Cmd>) -> bool {
-        for cmd in cmds {
+        let mut prev_stdout: Option<ChildStdout> = None;
+        let mut children = Vec::new();
+
+        for (i, cmd) in cmds.iter().enumerate() {
             match cmd {
                 Cmd::Exit => return false,
                 Cmd::Cd(args) => commands::cd(args),
                 Cmd::Pwd(args) => commands::pwd(args),
                 Cmd::SetVar(k, v) => {
-                    self.env_vars.insert(k, v);
+                    self.env_vars.insert(k.to_owned(), v.to_owned());
                 }
-                Cmd::GetVar(name) => self.get_var(name),
+                Cmd::GetVar(args) => self.get_var(args),
                 Cmd::ListVars => self.list_vars(),
-                Cmd::External(name, args) => self.execute_external(name, args),
+                Cmd::External(cmd_tokens) => {
+                    if let Some((name, args)) = cmd_tokens.split_first() {
+                        let mut cmd = Command::new(name);
+                        cmd.args(args);
+
+                        // not first command
+                        if let Some(stdout) = prev_stdout.take() {
+                            cmd.stdin(stdout);
+                        }
+
+                        // not last command
+                        if i != cmds.len() - 1 {
+                            cmd.stdout(Stdio::piped());
+                        }
+
+                        match cmd.spawn() {
+                            Ok(mut child) => {
+                                prev_stdout = child.stdout.take();
+                                children.push(child);
+                            }
+                            Err(e) => {
+                                println!("error executing command {}: {}", name, e);
+                            }
+                        };
+                    }
+                }
             };
         }
 
+        // wait for last command
+        if let Some(mut last) = children.pop() {
+            let _ = last.wait();
+        }
+
+        // wait for earlier commands
+        for mut child in children {
+            let _ = child.wait();
+        }
+
         true
-    }
-
-    fn execute_external(&self, name: String, args: Vec<String>) {
-        let status = process::Command::new(&name).args(args).status();
-
-        match status {
-            Ok(s) => {
-                if !s.success() {
-                    println!("{} exited with code {}", name, s);
-                }
-            }
-            Err(_) => println!("command not found: {}", name),
-        };
     }
 
     fn expand(&self, input: &str) -> String {
@@ -125,7 +151,7 @@ impl Shell {
         result
     }
 
-    fn get_var(&self, args: Vec<String>) {
+    fn get_var(&self, args: &[String]) {
         match args.len() {
             0 => println!("cd: expected key"),
             1 => {
@@ -147,26 +173,52 @@ impl Shell {
     }
 }
 
-fn process_input<'a>(mut input: impl Iterator<Item = &'a str>) -> Vec<Cmd> {
+fn process_input<'a>(input: impl Iterator<Item = &'a str>) -> Vec<Cmd> {
     let mut cmds = vec![];
-    while let Some(token) = input.next() {
+    let mut input = input.peekable();
+    while let Some(token) = input.peek() {
         if let Some((k, v)) = token.split_once("=") {
             cmds.push(Cmd::SetVar(k.to_owned(), v.to_owned()));
+            input.next();
         } else {
-            let args: Vec<String> = input.map(|s| s.to_owned()).collect();
-
-            cmds.push(match token {
-                "exit" => Cmd::Exit,
-                "get" => Cmd::GetVar(args),
-                "lsv" => Cmd::ListVars,
-                "cd" => Cmd::Cd(args),
-                "pwd" => Cmd::Pwd(args),
-                _ => Cmd::External(token.to_owned(), args),
-            });
-
+            cmds.extend(build_piped_commands(input.map(|s| s.to_owned()).collect()));
             break;
         }
     }
 
     cmds
 }
+
+// todo: fix this function
+//   - all Cmds are Cmd::External
+//   - does not account for syntax errors
+fn build_piped_commands(cmd: Vec<String>) -> Vec<Cmd> {
+    let mut cmds = vec![];
+    let mut curr_cmd = vec![];
+
+    for tok in cmd {
+        if tok == "|" {
+            if !curr_cmd.is_empty() {
+                cmds.push(Cmd::External(curr_cmd.clone()));
+                curr_cmd.clear();
+            }
+        } else {
+            curr_cmd.push(tok);
+        }
+    }
+
+    if !curr_cmd.is_empty() {
+        cmds.push(Cmd::External(curr_cmd.clone()));
+    }
+
+    cmds
+}
+
+// cmds.push(match token.as_str() {
+//     "exit" => Cmd::Exit,
+//     "get" => Cmd::GetVar(args),
+//     "lsv" => Cmd::ListVars,
+//     "cd" => Cmd::Cd(args),
+//     "pwd" => Cmd::Pwd(args),
+//     _ => Cmd::External(*token, args),
+// });
