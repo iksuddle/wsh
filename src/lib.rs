@@ -176,12 +176,13 @@ impl Shell {
 fn process_input<'a>(input: impl Iterator<Item = &'a str>) -> Vec<Cmd> {
     let mut cmds = vec![];
     let mut input = input.peekable();
+
     while let Some(token) = input.peek() {
         if let Some((k, v)) = token.split_once("=") {
             cmds.push(Cmd::SetVar(k.to_owned(), v.to_owned()));
             input.next();
         } else {
-            cmds.extend(build_piped_commands(input.map(|s| s.to_owned()).collect()));
+            cmds.extend(build_piped_commands(input));
             break;
         }
     }
@@ -192,18 +193,18 @@ fn process_input<'a>(input: impl Iterator<Item = &'a str>) -> Vec<Cmd> {
 // todo: fix this function
 //   - all Cmds shouldn't be Cmd::External
 //   - does not account for syntax errors like `foo | | bar`
-fn build_piped_commands(cmd: Vec<String>) -> Vec<Cmd> {
+fn build_piped_commands<'a>(input: impl Iterator<Item = &'a str>) -> Vec<Cmd> {
     let mut cmds = vec![];
     let mut curr_cmd = vec![];
 
-    for tok in cmd {
+    for tok in input {
         if tok == "|" {
             if !curr_cmd.is_empty() {
                 cmds.push(Cmd::External(curr_cmd.clone()));
                 curr_cmd.clear();
             }
         } else {
-            curr_cmd.push(tok);
+            curr_cmd.push(tok.to_owned());
         }
     }
 
