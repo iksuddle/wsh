@@ -2,14 +2,14 @@ use std::env;
 
 pub fn cd(args: &[String]) {
     match args.len() {
-        0 => {
+        1 => {
             let home = env::var("HOME").expect("error: $HOME not set");
             if let Err(e) = env::set_current_dir(home) {
                 println!("cd: operation failed: {}", e);
             }
         }
 
-        1 => {
+        2 => {
             if let Err(e) = env::set_current_dir(args.first().unwrap()) {
                 println!("cd: operation failed: {}", e);
             }
@@ -20,7 +20,7 @@ pub fn cd(args: &[String]) {
 }
 
 pub fn pwd(args: &[String]) {
-    if !args.is_empty() {
+    if args.len() > 1 {
         println!("pwd: too many arguments");
         return;
     }
