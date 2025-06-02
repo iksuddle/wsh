@@ -31,6 +31,34 @@ impl Cmd {
             _ => Cmd::External(cmd),
         }
     }
+
+    fn build_piped_commands<'a>(input: impl Iterator<Item = &'a str>) -> Vec<Cmd> {
+        let mut cmds = vec![];
+        let mut curr_cmd = vec![];
+
+        for tok in input {
+            if tok == "|" {
+                if !curr_cmd.is_empty() {
+                    cmds.push(Cmd::from(curr_cmd.clone()));
+                    curr_cmd.clear();
+                } else {
+                    // error -> | |
+                    cmds.push(Cmd::Error("syntax error: | |".to_owned()));
+                    curr_cmd.clear();
+                    break;
+                }
+            } else {
+                curr_cmd.push(tok.to_owned());
+            }
+        }
+
+        // last one
+        if !curr_cmd.is_empty() {
+            cmds.push(Cmd::from(curr_cmd));
+        }
+
+        cmds
+    }
 }
 
 pub struct Shell {
@@ -197,37 +225,9 @@ fn process_input<'a>(input: impl Iterator<Item = &'a str>) -> Vec<Cmd> {
             cmds.push(Cmd::SetVar(k.to_owned(), v.to_owned()));
             input.next();
         } else {
-            cmds.extend(build_piped_commands(input));
+            cmds.extend(Cmd::build_piped_commands(input));
             break;
         }
-    }
-
-    cmds
-}
-
-fn build_piped_commands<'a>(input: impl Iterator<Item = &'a str>) -> Vec<Cmd> {
-    let mut cmds = vec![];
-    let mut curr_cmd = vec![];
-
-    for tok in input {
-        if tok == "|" {
-            if !curr_cmd.is_empty() {
-                cmds.push(Cmd::from(curr_cmd.clone()));
-                curr_cmd.clear();
-            } else {
-                // error -> | |
-                cmds.push(Cmd::Error("syntax error: | |".to_owned()));
-                curr_cmd.clear();
-                break;
-            }
-        } else {
-            curr_cmd.push(tok.to_owned());
-        }
-    }
-
-    // last one
-    if !curr_cmd.is_empty() {
-        cmds.push(Cmd::from(curr_cmd));
     }
 
     cmds
