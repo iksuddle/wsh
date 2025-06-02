@@ -10,7 +10,7 @@ pub fn cd(args: &[String]) {
         }
 
         2 => {
-            if let Err(e) = env::set_current_dir(args.first().unwrap()) {
+            if let Err(e) = env::set_current_dir(&args[1]) {
                 println!("cd: operation failed: {}", e);
             }
         }
