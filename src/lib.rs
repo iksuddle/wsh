@@ -1,9 +1,13 @@
 use std::{
     collections::HashMap,
-    error::Error,
     io::{self, Write, stdout},
     process::{ChildStdout, Command, Stdio},
-    vec,
+    thread, vec,
+};
+
+use signal_hook::{
+    consts::{SIGINT, TERM_SIGNALS},
+    iterator::Signals,
 };
 
 mod commands;
@@ -74,13 +78,18 @@ impl Shell {
         }
     }
 
-    pub fn run(&mut self) -> Result<(), Box<dyn Error>> {
-        // ignore ctrl+c
-        let prompt = self.prompt.clone();
-        ctrlc::set_handler(move || {
-            print!("\n{}", prompt);
-            stdout().flush().ok();
-        })?;
+    pub fn run(&mut self) -> Result<(), io::Error> {
+        // ignore ctrl+c and kill
+        let mut signals = Signals::new(TERM_SIGNALS)?;
+        // let handle = signals.handle();
+        thread::spawn(move || {
+            for signal in signals.forever() {
+                match signal {
+                    SIGINT => todo!(),
+                    _ => println!("received signal: {}", signal),
+                };
+            }
+        });
 
         let mut input = String::new();
         loop {
