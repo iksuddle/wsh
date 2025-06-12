@@ -2,13 +2,10 @@ use std::{
     collections::HashMap,
     io::{self, Write, stdout},
     process::{ChildStdout, Command, Stdio},
-    thread, vec,
+    vec,
 };
 
-use signal_hook::{
-    consts::{SIGINT, TERM_SIGNALS},
-    iterator::Signals,
-};
+use nix::sys::signal::{SigSet, Signal};
 
 mod commands;
 
@@ -23,48 +20,6 @@ enum Cmd {
     External(Vec<String>),
     Error(String),
 }
-
-impl Cmd {
-    fn from(cmd: Vec<String>) -> Cmd {
-        match cmd.first().unwrap().as_str() {
-            "exit" => Cmd::Exit,
-            "cd" => Cmd::Cd(cmd),
-            "pwd" => Cmd::Pwd(cmd),
-            "lsv" => Cmd::ListVars,
-            "get" => Cmd::GetVar(cmd),
-            _ => Cmd::External(cmd),
-        }
-    }
-
-    fn build_piped_commands<'a>(input: impl Iterator<Item = &'a str>) -> Vec<Cmd> {
-        let mut cmds = vec![];
-        let mut curr_cmd = vec![];
-
-        for tok in input {
-            if tok == "|" {
-                if !curr_cmd.is_empty() {
-                    cmds.push(Cmd::from(curr_cmd.clone()));
-                    curr_cmd.clear();
-                } else {
-                    // error -> | |
-                    cmds.push(Cmd::Error("syntax error: | |".to_owned()));
-                    curr_cmd.clear();
-                    break;
-                }
-            } else {
-                curr_cmd.push(tok.to_owned());
-            }
-        }
-
-        // last one
-        if !curr_cmd.is_empty() {
-            cmds.push(Cmd::from(curr_cmd));
-        }
-
-        cmds
-    }
-}
-
 pub struct Shell {
     prompt: String,
     env_vars: HashMap<String, String>,
@@ -79,17 +34,14 @@ impl Shell {
     }
 
     pub fn run(&mut self) -> Result<(), io::Error> {
-        // ignore ctrl+c and kill
-        let mut signals = Signals::new(TERM_SIGNALS)?;
-        // let handle = signals.handle();
-        thread::spawn(move || {
-            for signal in signals.forever() {
-                match signal {
-                    SIGINT => todo!(),
-                    _ => println!("received signal: {}", signal),
-                };
-            }
-        });
+        let mut to_block = SigSet::empty();
+        to_block.add(Signal::SIGINT);
+        to_block.add(Signal::SIGTERM);
+        to_block.add(Signal::SIGQUIT);
+        to_block.add(Signal::SIGTSTP);
+        to_block
+            .thread_block()
+            .expect("error adding signals to mask");
 
         let mut input = String::new();
         loop {
@@ -222,6 +174,47 @@ impl Shell {
         for (k, v) in &self.env_vars {
             println!("{k}: {v}");
         }
+    }
+}
+
+impl Cmd {
+    fn from(cmd: Vec<String>) -> Cmd {
+        match cmd.first().unwrap().as_str() {
+            "exit" => Cmd::Exit,
+            "cd" => Cmd::Cd(cmd),
+            "pwd" => Cmd::Pwd(cmd),
+            "lsv" => Cmd::ListVars,
+            "get" => Cmd::GetVar(cmd),
+            _ => Cmd::External(cmd),
+        }
+    }
+
+    fn build_piped_commands<'a>(input: impl Iterator<Item = &'a str>) -> Vec<Cmd> {
+        let mut cmds = vec![];
+        let mut curr_cmd = vec![];
+
+        for tok in input {
+            if tok == "|" {
+                if !curr_cmd.is_empty() {
+                    cmds.push(Cmd::from(curr_cmd.clone()));
+                    curr_cmd.clear();
+                } else {
+                    // error -> | |
+                    cmds.push(Cmd::Error("syntax error: | |".to_owned()));
+                    curr_cmd.clear();
+                    break;
+                }
+            } else {
+                curr_cmd.push(tok.to_owned());
+            }
+        }
+
+        // last one
+        if !curr_cmd.is_empty() {
+            cmds.push(Cmd::from(curr_cmd));
+        }
+
+        cmds
     }
 }
 
