@@ -3,16 +3,13 @@ use std::{iter::Peekable, panic, str::Chars};
 #[derive(Debug, PartialEq, Eq)]
 pub enum Token {
     // Single-character tokens.
-    Dollar,
     LeftParen,
     RightParen,
     Pipe,
     Equal,
 
     // Literals.
-    Word(String),
-    String(String),
-    Variable(String),
+    Literal(String),
 
     Eof,
 }
@@ -31,28 +28,16 @@ impl<'a> Scanner<'a> {
     pub fn scan_tokens(&mut self) -> Vec<Token> {
         let mut tokens = vec![];
 
-        while let Some(c) = self.chars.peek() {
+        while let Some(c) = self.chars.next() {
             let token = match c {
                 ' ' | '\n' | '\t' => {
-                    self.chars.next();
                     continue;
                 }
-                '(' => self.advance_with(Token::LeftParen),
-                ')' => self.advance_with(Token::RightParen),
-                '|' => self.advance_with(Token::Pipe),
-                '=' => self.advance_with(Token::Equal),
-                '$' => {
-                    self.chars.next();
-                    let mut token = Token::Dollar;
-                    if let Some(n) = self.chars.peek() {
-                        if n.is_alphanumeric() {
-                            token = Token::Variable(self.scan_word())
-                        }
-                    }
-                    token
-                }
-                '"' => self.scan_string(),
-                _ => Token::Word(self.scan_word()),
+                '(' => Token::LeftParen,
+                ')' => Token::RightParen,
+                '|' => Token::Pipe,
+                '=' => Token::Equal,
+                x => Token::Literal(self.scan_literal(x)),
             };
 
             tokens.push(token);
@@ -63,36 +48,36 @@ impl<'a> Scanner<'a> {
         tokens
     }
 
-    fn advance_with(&mut self, token: Token) -> Token {
-        self.chars.next();
-        token
-    }
+    fn scan_literal(&mut self, start: char) -> String {
+        if start == '"' {
+            return self.scan_string(start);
+        }
 
-    fn scan_word(&mut self) -> String {
-        let mut word = String::new();
-        word.push(self.chars.next().unwrap());
+        let mut literal = String::new();
+        literal.push(start);
 
         while let Some(c) = self.chars.peek() {
-            if c.is_ascii_alphanumeric() || *c == '_' {
-                word.push(self.chars.next().unwrap());
+            if c.is_ascii_alphanumeric() || *c == '_' || *c == '-' {
+                literal.push(self.chars.next().unwrap());
             } else {
                 break;
             }
         }
 
-        word
+        literal
     }
 
-    fn scan_string(&mut self) -> Token {
+    fn scan_string(&mut self, start: char) -> String {
         let mut string = String::new();
-        self.chars.next();
+        string.push(start);
 
-        for c in &mut self.chars {
-            match c {
-                '"' => return Token::String(string),
-                _ => string.push(c),
-            };
+        while let Some(c) = self.chars.next() {
+            string.push(c);
+            if c == '"' {
+                break;
+            }
         }
-        panic!("string not closed")
+
+        string
     }
 }
