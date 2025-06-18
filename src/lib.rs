@@ -8,6 +8,8 @@ use std::{
 use nix::sys::signal::{SigSet, Signal};
 
 mod commands;
+pub mod scanner;
+
 use commands::Cmd;
 
 pub struct Shell {
