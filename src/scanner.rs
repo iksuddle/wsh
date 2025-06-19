@@ -74,10 +74,10 @@ impl<'a> Scanner<'a> {
     }
 
     fn is_valid_literal_char(&self, start: &char) -> bool {
-        start.is_alphanumeric() || "_-=.".contains(*start)
+        start.is_alphanumeric() || "_-=./:".contains(*start)
     }
 
     fn is_valid_literal_start(&self, start: &char) -> bool {
-        start.is_alphanumeric() || "_-=\"".contains(*start)
+        start.is_alphanumeric() || "_-=.\"/:".contains(*start)
     }
 }

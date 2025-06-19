@@ -82,19 +82,17 @@ impl Shell {
                 Cmd::SetVar(k, v) => {
                     self.env_vars.insert(k.to_owned(), v.to_owned());
                 }
-                Cmd::GetVar(args) => self.get_var(args),
-                Cmd::ListVars => self.list_vars(),
+                Cmd::GetVar(args) => self.bn_get(args),
+                Cmd::ListVars => self.bn_lsv(),
                 Cmd::External(cmd_tokens) => {
                     if let Some((name, args)) = cmd_tokens.split_first() {
                         let mut cmd = Command::new(name);
                         cmd.args(args);
 
-                        // not first command
                         if let Some(stdout) = prev_stdout.take() {
                             cmd.stdin(stdout);
                         }
 
-                        // not last command
                         if i != cmds.len() - 1 {
                             cmd.stdout(Stdio::piped());
                         }
@@ -106,6 +104,7 @@ impl Shell {
                             }
                             Err(e) => {
                                 println!("error executing command {}: {}", name, e);
+                                break;
                             }
                         };
                     }
@@ -114,13 +113,21 @@ impl Shell {
         }
 
         // wait for last command
-        if let Some(mut last) = children.pop() {
-            let _ = last.wait();
-        }
-
-        // wait for earlier commands
         for mut child in children {
-            let _ = child.wait();
+            match child.wait() {
+                Ok(status) => {
+                    if !status.success() {
+                        println!(
+                            "command [{}] exited with status: {:?}",
+                            child.id(),
+                            status.code()
+                        );
+                    }
+                }
+                Err(e) => {
+                    println!("error waiting for command: {}", e);
+                }
+            }
         }
 
         true
@@ -142,12 +149,8 @@ impl Shell {
                     chars.next();
                 }
 
-                if let Some(v) = self.env_vars.get(&var_name) {
-                    result.push_str(v);
-                } else {
-                    result.push('$');
-                    result.push_str(&var_name);
-                }
+                let val = self.get_var(&var_name);
+                result.push_str(&val);
             } else {
                 result.push(c)
             }
@@ -156,24 +159,34 @@ impl Shell {
         result
     }
 
-    fn get_var(&self, args: &[String]) {
+    fn bn_get(&self, args: &[String]) {
         match args.len() {
             1 => println!("get: expected key"),
             2 => {
                 let key = &args[1];
-                match self.env_vars.get(key) {
-                    Some(val) => println!("{}", val),
-                    None => println!("get: key '{}' not found", key),
-                }
+                println!("{}", self.get_var(key))
             }
             _ => print!("get: too many arguments"),
         }
     }
 
-    fn list_vars(&self) {
+    fn bn_lsv(&self) {
         println!("{} items:", self.env_vars.len());
         for (k, v) in &self.env_vars {
             println!("{k}: {v}");
+        }
+    }
+
+    fn get_var(&self, key: &str) -> String {
+        if let Some(v) = self.env_vars.get(key) {
+            return v.to_owned();
+        } else {
+            // check env vars
+            let val = match std::env::var(key) {
+                Ok(val) => val,
+                Err(_) => "".to_owned(),
+            };
+            return val;
         }
     }
 }
