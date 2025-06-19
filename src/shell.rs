@@ -4,7 +4,10 @@ use std::{
     process::{ChildStdout, Command, Stdio},
 };
 
-use nix::sys::signal::{SigSet, Signal};
+use nix::{
+    Error,
+    sys::signal::{SigSet, Signal},
+};
 
 use crate::{
     commands::{Cmd, builtins},
@@ -47,11 +50,20 @@ impl Shell {
             }
 
             let input = self.expand(&input);
+
             let mut scanner = Scanner::new(input.as_str());
-            let tokens = scanner.scan_tokens();
+
+            let tokens = match scanner.scan_tokens() {
+                Ok(tokens) => tokens,
+                Err(e) => {
+                    println!("{}", e);
+                    continue;
+                }
+            };
 
             let cmds = Cmd::process_input(tokens);
 
+            // false -> exit
             if !self.execute(cmds) {
                 break;
             }
@@ -149,15 +161,15 @@ impl Shell {
 
     fn get_var(&self, args: &[String]) {
         match args.len() {
-            0 => println!("cd: expected key"),
-            1 => {
-                let key = args.first().unwrap();
+            1 => println!("get: expected key"),
+            2 => {
+                let key = &args[1];
                 match self.env_vars.get(key) {
                     Some(val) => println!("{}", val),
-                    None => println!("cd: key '{}' not found", key),
+                    None => println!("get: key '{}' not found", key),
                 }
             }
-            _ => print!("cd: too many arguments"),
+            _ => print!("get: too many arguments"),
         }
     }
 

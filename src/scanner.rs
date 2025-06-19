@@ -18,7 +18,7 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    pub fn scan_tokens(&mut self) -> Vec<Token> {
+    pub fn scan_tokens(&mut self) -> Result<Vec<Token>, String> {
         let mut tokens = vec![];
 
         while let Some(c) = self.chars.next() {
@@ -27,7 +27,7 @@ impl<'a> Scanner<'a> {
                 '|' => Token::Pipe,
                 x => {
                     if !self.is_valid_literal_start(&x) {
-                        panic!("unexpected token: {}", x);
+                        return Err(format!("unexpected token: {x}"));
                     }
                     Token::Literal(self.scan_literal(x))
                 }
@@ -38,7 +38,7 @@ impl<'a> Scanner<'a> {
 
         tokens.push(Token::Eof);
 
-        tokens
+        Ok(tokens)
     }
 
     fn scan_literal(&mut self, start: char) -> String {
@@ -74,7 +74,7 @@ impl<'a> Scanner<'a> {
     }
 
     fn is_valid_literal_char(&self, start: &char) -> bool {
-        start.is_alphanumeric() || "_-=".contains(*start)
+        start.is_alphanumeric() || "_-=.".contains(*start)
     }
 
     fn is_valid_literal_start(&self, start: &char) -> bool {
