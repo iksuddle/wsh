@@ -1,16 +1,9 @@
-use std::{iter::Peekable, panic, str::Chars};
+use std::{iter::Peekable, str::Chars};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Token {
-    // Single-character tokens.
-    LeftParen,
-    RightParen,
     Pipe,
-    Equal,
-
-    // Literals.
     Literal(String),
-
     Eof,
 }
 
@@ -30,14 +23,14 @@ impl<'a> Scanner<'a> {
 
         while let Some(c) = self.chars.next() {
             let token = match c {
-                ' ' | '\n' | '\t' => {
-                    continue;
-                }
-                '(' => Token::LeftParen,
-                ')' => Token::RightParen,
+                ' ' | '\n' | '\t' => continue,
                 '|' => Token::Pipe,
-                '=' => Token::Equal,
-                x => Token::Literal(self.scan_literal(x)),
+                x => {
+                    if !self.is_valid_literal_start(&x) {
+                        panic!("unexpected token: {}", x);
+                    }
+                    Token::Literal(self.scan_literal(x))
+                }
             };
 
             tokens.push(token);
@@ -50,14 +43,14 @@ impl<'a> Scanner<'a> {
 
     fn scan_literal(&mut self, start: char) -> String {
         if start == '"' {
-            return self.scan_string(start);
+            return self.scan_string();
         }
 
         let mut literal = String::new();
         literal.push(start);
 
-        while let Some(c) = self.chars.peek() {
-            if c.is_ascii_alphanumeric() || *c == '_' || *c == '-' {
+        while let Some(&c) = self.chars.peek() {
+            if self.is_valid_literal_char(&c) {
                 literal.push(self.chars.next().unwrap());
             } else {
                 break;
@@ -67,17 +60,24 @@ impl<'a> Scanner<'a> {
         literal
     }
 
-    fn scan_string(&mut self, start: char) -> String {
+    fn scan_string(&mut self) -> String {
         let mut string = String::new();
-        string.push(start);
-
-        while let Some(c) = self.chars.next() {
-            string.push(c);
+        for c in &mut self.chars {
             if c == '"' {
+                self.chars.next();
                 break;
             }
+            string.push(c);
         }
 
         string
+    }
+
+    fn is_valid_literal_char(&self, start: &char) -> bool {
+        start.is_alphanumeric() || "_-=".contains(*start)
+    }
+
+    fn is_valid_literal_start(&self, start: &char) -> bool {
+        start.is_alphanumeric() || "_-=\"".contains(*start)
     }
 }

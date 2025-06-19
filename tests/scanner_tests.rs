@@ -6,20 +6,52 @@ fn tokenize(input: &str) -> Vec<Token> {
 
 #[test]
 fn test_scanner() {
-    let tokens = tokenize("=(-24)() foo_bar)\" this is| a $() test  \"|");
+    let tokens = tokenize("echo \"hello world\" | wc");
     assert_eq!(
         tokens,
         vec![
-            Token::Equal,
-            Token::LeftParen,
-            Token::Literal("-24".to_owned()),
-            Token::RightParen,
-            Token::LeftParen,
-            Token::RightParen,
-            Token::Literal("foo_bar".to_owned()),
-            Token::RightParen,
-            Token::Literal("\" this is| a $() test  \"".to_owned()),
+            Token::Literal("echo".to_owned()),
+            Token::Literal("\"hello world\"".to_owned()),
             Token::Pipe,
+            Token::Literal("wc".to_owned()),
+            Token::Eof
+        ]
+    );
+
+    let tokens = tokenize("ls -la");
+    assert_eq!(
+        tokens,
+        vec![
+            Token::Literal("ls".to_owned()),
+            Token::Literal("-la".to_owned()),
+            Token::Eof
+        ]
+    );
+
+    let tokens = tokenize("echo \" this is | a $ test  \" | wc | wc");
+    assert_eq!(
+        tokens,
+        vec![
+            Token::Literal("echo".to_owned()),
+            Token::Literal("\" this is | a $ test  \"".to_owned()),
+            Token::Pipe,
+            Token::Literal("wc".to_owned()),
+            Token::Pipe,
+            Token::Literal("wc".to_owned()),
+            Token::Eof
+        ]
+    );
+}
+
+#[test]
+#[should_panic]
+fn test_scanner_panic() {
+    let tokens = tokenize("ls -la *");
+    assert_eq!(
+        tokens,
+        vec![
+            Token::Literal("ls".to_owned()),
+            Token::Literal("-la".to_owned()),
             Token::Eof
         ]
     );
