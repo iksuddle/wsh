@@ -4,10 +4,7 @@ use std::{
     process::{ChildStdout, Command, Stdio},
 };
 
-use nix::{
-    Error,
-    sys::signal::{SigSet, Signal},
-};
+use nix::sys::signal::{SigSet, Signal};
 
 use crate::{
     commands::{Cmd, builtins},
