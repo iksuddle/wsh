@@ -3,7 +3,7 @@ use std::env;
 use crate::scanner::Token;
 
 #[derive(Debug)]
-pub enum Cmd {
+pub enum Command {
     Exit,
     Cd(Vec<String>),
     Pwd(Vec<String>),
@@ -14,19 +14,19 @@ pub enum Cmd {
     Error(String),
 }
 
-impl Cmd {
-    pub fn from(cmd: Vec<String>) -> Cmd {
+impl Command {
+    pub fn from(cmd: Vec<String>) -> Command {
         match cmd.first().unwrap().as_str() {
-            "exit" => Cmd::Exit,
-            "cd" => Cmd::Cd(cmd),
-            "pwd" => Cmd::Pwd(cmd),
-            "lsv" => Cmd::ListVars,
-            "get" => Cmd::GetVar(cmd),
-            _ => Cmd::External(cmd),
+            "exit" => Command::Exit,
+            "cd" => Command::Cd(cmd),
+            "pwd" => Command::Pwd(cmd),
+            "lsv" => Command::ListVars,
+            "get" => Command::GetVar(cmd),
+            _ => Command::External(cmd),
         }
     }
 
-    pub fn process_input(tokens: Vec<Token>) -> Vec<Cmd> {
+    pub fn process_input(tokens: Vec<Token>) -> Vec<Command> {
         let mut cmds = vec![];
 
         let mut tokens = tokens.iter().peekable();
@@ -34,7 +34,7 @@ impl Cmd {
         // consume all variable assignments
         while let Some(Token::Literal(l)) = tokens.peek() {
             if let Some((k, v)) = l.split_once("=") {
-                cmds.push(Cmd::SetVar(k.to_owned(), v.to_owned()));
+                cmds.push(Command::SetVar(k.to_owned(), v.to_owned()));
                 tokens.next();
             } else {
                 break;
@@ -46,7 +46,7 @@ impl Cmd {
         cmds
     }
 
-    fn build_piped_commands<'a>(tokens: impl Iterator<Item = &'a Token>) -> Vec<Cmd> {
+    fn build_piped_commands<'a>(tokens: impl Iterator<Item = &'a Token>) -> Vec<Command> {
         let mut cmds = vec![];
 
         let mut curr_cmd = vec![];
@@ -55,11 +55,11 @@ impl Cmd {
             match token {
                 Token::Pipe => {
                     if !curr_cmd.is_empty() {
-                        cmds.push(Cmd::from(curr_cmd.clone()));
+                        cmds.push(Command::from(curr_cmd.clone()));
                         curr_cmd.clear();
                     } else {
                         // error -> | |
-                        cmds.push(Cmd::Error("syntax error: | |".to_owned()));
+                        cmds.push(Command::Error("syntax error: | |".to_owned()));
                         curr_cmd.clear();
                         break;
                     }
@@ -72,7 +72,7 @@ impl Cmd {
         }
         // last one
         if !curr_cmd.is_empty() {
-            cmds.push(Cmd::from(curr_cmd));
+            cmds.push(Command::from(curr_cmd));
         }
 
         cmds

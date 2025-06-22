@@ -1,13 +1,13 @@
 use std::{
     collections::HashMap,
     io::{self, Write, stdout},
-    process::{ChildStdout, Command, Stdio},
+    process::{self, ChildStdout, Stdio},
 };
 
 use nix::sys::signal::{SigSet, Signal};
 
 use crate::{
-    commands::{Cmd, builtins},
+    commands::{Command, builtins},
     scanner::Scanner,
 };
 
@@ -58,7 +58,7 @@ impl Shell {
                 }
             };
 
-            let cmds = Cmd::process_input(tokens);
+            let cmds = Command::process_input(tokens);
 
             // false -> exit
             if !self.execute(cmds) {
@@ -69,24 +69,24 @@ impl Shell {
         Ok(())
     }
 
-    fn execute(&mut self, cmds: Vec<Cmd>) -> bool {
+    fn execute(&mut self, cmds: Vec<Command>) -> bool {
         let mut prev_stdout: Option<ChildStdout> = None;
         let mut children = Vec::new();
 
         for (i, cmd) in cmds.iter().enumerate() {
             match cmd {
-                Cmd::Error(msg) => println!("error: {}", msg),
-                Cmd::Exit => return false,
-                Cmd::Cd(args) => builtins::cd(args),
-                Cmd::Pwd(args) => builtins::pwd(args),
-                Cmd::SetVar(k, v) => {
+                Command::Error(msg) => println!("error: {}", msg),
+                Command::Exit => return false,
+                Command::Cd(args) => builtins::cd(args),
+                Command::Pwd(args) => builtins::pwd(args),
+                Command::SetVar(k, v) => {
                     self.env_vars.insert(k.to_owned(), v.to_owned());
                 }
-                Cmd::GetVar(args) => self.bn_get(args),
-                Cmd::ListVars => self.bn_lsv(),
-                Cmd::External(cmd_tokens) => {
+                Command::GetVar(args) => self.bn_get(args),
+                Command::ListVars => self.bn_lsv(),
+                Command::External(cmd_tokens) => {
                     if let Some((name, args)) = cmd_tokens.split_first() {
-                        let mut cmd = Command::new(name);
+                        let mut cmd = process::Command::new(name);
                         cmd.args(args);
 
                         if let Some(stdout) = prev_stdout.take() {
@@ -180,13 +180,11 @@ impl Shell {
     fn get_var(&self, key: &str) -> String {
         if let Some(v) = self.env_vars.get(key) {
             return v.to_owned();
-        } else {
-            // check env vars
-            let val = match std::env::var(key) {
-                Ok(val) => val,
-                Err(_) => "".to_owned(),
-            };
-            return val;
+        }
+        // check env vars
+        match std::env::var(key) {
+            Ok(val) => val,
+            Err(_) => "".to_owned(),
         }
     }
 }
