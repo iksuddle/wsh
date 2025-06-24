@@ -1,11 +1,10 @@
 use std::{
     collections::HashMap,
-    io::{self, Write, stdout},
+    io,
     process::{self, ChildStdout, Stdio},
 };
 
-use nix::sys::signal::SigSet;
-use reedline::{DefaultPrompt, DefaultPromptSegment, Reedline, Signal};
+use rustyline::{DefaultEditor, error::ReadlineError};
 
 use crate::{
     commands::{Command, builtins},
@@ -13,33 +12,29 @@ use crate::{
 };
 
 pub struct Shell {
-    prompt: DefaultPrompt,
-    line_editor: Reedline,
+    prompt: String,
+    line_reader: DefaultEditor,
     env_vars: HashMap<String, String>,
 }
 
 impl Shell {
     pub fn new(prompt: String) -> Shell {
         Shell {
-            prompt: DefaultPrompt::new(
-                DefaultPromptSegment::Basic(prompt),
-                DefaultPromptSegment::Empty,
-            ),
-            line_editor: Reedline::create(),
+            prompt,
+            line_reader: DefaultEditor::new().expect("error creating line editor"),
             env_vars: HashMap::new(),
         }
     }
 
     pub fn run(&mut self) -> Result<(), io::Error> {
         loop {
-            let sig = self.line_editor.read_line(&self.prompt);
-            let input = match sig {
-                Ok(Signal::Success(buffer)) => buffer,
-                Ok(Signal::CtrlD) => break,
-                Ok(Signal::CtrlC) => continue,
-                Err(e) => {
-                    println!("error: {}", e);
-                    continue;
+            let input = match self.line_reader.readline(&self.prompt) {
+                Ok(line) => line,
+                Err(ReadlineError::Interrupted) => continue,
+                Err(ReadlineError::Eof) => break,
+                Err(err) => {
+                    println!("error: {:?}", err);
+                    break;
                 }
             };
 
