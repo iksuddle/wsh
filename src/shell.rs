@@ -4,7 +4,8 @@ use std::{
     process::{self, ChildStdout, Stdio},
 };
 
-use nix::sys::signal::{SigSet, Signal};
+use nix::sys::signal::SigSet;
+use reedline::{DefaultPrompt, DefaultPromptSegment, Reedline, Signal};
 
 use crate::{
     commands::{Command, builtins},
@@ -12,39 +13,35 @@ use crate::{
 };
 
 pub struct Shell {
-    prompt: String,
+    prompt: DefaultPrompt,
+    line_editor: Reedline,
     env_vars: HashMap<String, String>,
 }
 
 impl Shell {
     pub fn new(prompt: String) -> Shell {
         Shell {
-            prompt,
+            prompt: DefaultPrompt::new(
+                DefaultPromptSegment::Basic(prompt),
+                DefaultPromptSegment::Empty,
+            ),
+            line_editor: Reedline::create(),
             env_vars: HashMap::new(),
         }
     }
 
     pub fn run(&mut self) -> Result<(), io::Error> {
-        let mut to_block = SigSet::empty();
-        to_block.add(Signal::SIGINT);
-        to_block.add(Signal::SIGTERM);
-        to_block.add(Signal::SIGQUIT);
-        to_block.add(Signal::SIGTSTP);
-        to_block
-            .thread_block()
-            .expect("error adding signals to mask");
-
-        let mut input = String::new();
         loop {
-            print!("{}", self.prompt);
-            stdout().flush()?;
-
-            input.clear();
-            if io::stdin().read_line(&mut input)? == 0 {
-                // 0 bytes read => ctrl+d
-                println!();
-                break;
-            }
+            let sig = self.line_editor.read_line(&self.prompt);
+            let input = match sig {
+                Ok(Signal::Success(buffer)) => buffer,
+                Ok(Signal::CtrlD) => break,
+                Ok(Signal::CtrlC) => continue,
+                Err(e) => {
+                    println!("error: {}", e);
+                    continue;
+                }
+            };
 
             let input = self.expand(&input);
 
@@ -112,7 +109,7 @@ impl Shell {
             };
         }
 
-        // wait for last command
+        // wait for commands
         for mut child in children {
             match child.wait() {
                 Ok(status) => {
