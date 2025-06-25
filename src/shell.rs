@@ -11,6 +11,11 @@ use crate::{
     scanner::Scanner,
 };
 
+enum ExecError {
+    Exit,
+    CommandNotFound(String),
+}
+
 pub struct Shell {
     prompt: String,
     line_reader: DefaultEditor,
@@ -52,23 +57,24 @@ impl Shell {
 
             let cmds = Command::process_input(tokens);
 
-            // false -> exit
-            if !self.execute(cmds) {
-                break;
+            match self.execute(cmds) {
+                Err(ExecError::Exit) => break,
+                Err(ExecError::CommandNotFound(cmd)) => println!("command not found: {cmd}"),
+                _ => (),
             }
         }
 
         Ok(())
     }
 
-    fn execute(&mut self, cmds: Vec<Command>) -> bool {
+    fn execute(&mut self, cmds: Vec<Command>) -> Result<(), ExecError> {
         let mut prev_stdout: Option<ChildStdout> = None;
         let mut children = Vec::new();
 
         for (i, cmd) in cmds.iter().enumerate() {
             match cmd {
                 Command::Error(msg) => println!("error: {}", msg),
-                Command::Exit => return false,
+                Command::Exit => return Err(ExecError::Exit),
                 Command::Cd(args) => builtins::cd(args),
                 Command::Pwd(args) => builtins::pwd(args),
                 Command::SetVar(k, v) => {
@@ -94,10 +100,7 @@ impl Shell {
                                 prev_stdout = child.stdout.take();
                                 children.push(child);
                             }
-                            Err(e) => {
-                                println!("error executing command {}: {}", name, e);
-                                break;
-                            }
+                            Err(_) => return Err(ExecError::CommandNotFound(name.to_owned())),
                         };
                     }
                 }
@@ -110,9 +113,9 @@ impl Shell {
                 Ok(status) => {
                     if !status.success() {
                         println!(
-                            "command [{}] exited with status: {:?}",
+                            "command {} exited with status {:?}",
                             child.id(),
-                            status.code()
+                            status.code().unwrap()
                         );
                     }
                 }
@@ -122,7 +125,7 @@ impl Shell {
             }
         }
 
-        true
+        Ok(())
     }
 
     fn expand(&self, input: &str) -> String {
