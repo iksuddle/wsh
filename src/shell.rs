@@ -15,6 +15,7 @@ use crate::{
 enum ExecError {
     Exit,
     CommandNotFound(String),
+    PermissionError,
 }
 
 pub struct Shell {
@@ -61,6 +62,7 @@ impl Shell {
             match self.execute(cmds) {
                 Err(ExecError::Exit) => break,
                 Err(ExecError::CommandNotFound(cmd)) => println!("command not found: {cmd}"),
+                Err(ExecError::PermissionError) => println!("permission denied"),
                 _ => (),
             }
         }
@@ -105,7 +107,7 @@ impl Shell {
                                 Ok(file) => file,
                                 Err(e) => {
                                     println!("error reading file: {}", e);
-                                    return false;
+                                    return Err(ExecError::PermissionError);
                                 }
                             });
                         }
