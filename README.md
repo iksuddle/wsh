@@ -8,6 +8,7 @@ A small shell I am writing to learn Rust.
 - set variables: `foo=bar`
 - expand variables: `echo $foo -> echo bar`
 - pipes: `cat Cargo.lock | grep "name"`
+- input/output redirection: `echo "hello world" > msg.txt`
 
 ## Example
 
@@ -36,4 +37,9 @@ bar
 Pipe commands:
 ```
 cat Cargo.lock | grep "name"
+```
+
+Redirect IO:
+```
+cat < input.txt | grep "foo" | wc -l > count.txt
 ```
