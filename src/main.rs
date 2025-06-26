@@ -1,9 +1,15 @@
 use std::process;
 
-use wsh::Shell;
+use wsh::{Config, Shell};
 
 fn main() {
-    let mut shell = Shell::new("$ ".to_owned());
+    // todo: parse --prompt $ from args
+    let config = Config::build(None).unwrap_or_else(|err| {
+        println!("{}", err);
+        Config::default()
+    });
+
+    let mut shell = Shell::new(config);
 
     if let Err(e) = shell.run() {
         eprintln!("application error: {}", e);

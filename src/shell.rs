@@ -8,6 +8,7 @@ use std::{
 use rustyline::{DefaultEditor, error::ReadlineError};
 
 use crate::{
+    Config,
     commands::{Command, CommandIO, builtins},
     scanner::Scanner,
 };
@@ -25,9 +26,9 @@ pub struct Shell {
 }
 
 impl Shell {
-    pub fn new(prompt: String) -> Shell {
+    pub fn new(config: Config) -> Shell {
         Shell {
-            prompt,
+            prompt: config.prompt,
             line_reader: DefaultEditor::new().expect("error creating line editor"),
             env_vars: HashMap::new(),
         }
