@@ -1,7 +1,7 @@
 use wsh::{scanner::Scanner, scanner::Token};
 
 fn tokenize(input: &str) -> Vec<Token> {
-    Scanner::new(input).scan_tokens()
+    Scanner::new(input).scan_tokens().unwrap()
 }
 
 #[test]
@@ -11,7 +11,7 @@ fn test_scanner() {
         tokens,
         vec![
             Token::Literal("echo".to_owned()),
-            Token::Literal("\"hello world\"".to_owned()),
+            Token::Literal("hello world".to_owned()),
             Token::Pipe,
             Token::Literal("wc".to_owned()),
             Token::Eof
@@ -33,7 +33,7 @@ fn test_scanner() {
         tokens,
         vec![
             Token::Literal("echo".to_owned()),
-            Token::Literal("\" this is | a $ test  \"".to_owned()),
+            Token::Literal(" this is | a $ test  ".to_owned()),
             Token::Pipe,
             Token::Literal("wc".to_owned()),
             Token::Pipe,
@@ -41,6 +41,18 @@ fn test_scanner() {
             Token::Eof
         ]
     );
+
+    let tokens = tokenize("echo hello > out.txt");
+    assert_eq!(
+        tokens,
+        vec![
+            Token::Literal("echo".to_owned()),
+            Token::Literal("hello".to_owned()),
+            Token::Greater,
+            Token::Literal("out.txt".to_owned()),
+            Token::Eof,
+        ]
+    )
 }
 
 #[test]

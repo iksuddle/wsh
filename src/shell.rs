@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    fs::File,
     io,
     process::{self, ChildStdout, Stdio},
 };
@@ -7,7 +8,7 @@ use std::{
 use rustyline::{DefaultEditor, error::ReadlineError};
 
 use crate::{
-    commands::{Command, builtins},
+    commands::{Command, CommandIO, builtins},
     scanner::Scanner,
 };
 
@@ -82,8 +83,12 @@ impl Shell {
                 }
                 Command::GetVar(args) => self.bn_get(args),
                 Command::ListVars => self.bn_lsv(),
-                Command::External(cmd_tokens) => {
-                    if let Some((name, args)) = cmd_tokens.split_first() {
+                Command::External {
+                    args,
+                    input,
+                    output,
+                } => {
+                    if let Some((name, args)) = args.split_first() {
                         let mut cmd = process::Command::new(name);
                         cmd.args(args);
 
@@ -93,6 +98,20 @@ impl Shell {
 
                         if i != cmds.len() - 1 {
                             cmd.stdout(Stdio::piped());
+                        }
+
+                        if let CommandIO::File(path) = input {
+                            cmd.stdin(match File::open(path) {
+                                Ok(file) => file,
+                                Err(e) => {
+                                    println!("error reading file: {}", e);
+                                    return false;
+                                }
+                            });
+                        }
+
+                        if let CommandIO::File(path) = output {
+                            cmd.stdout(File::create(path).expect("error creating file"));
                         }
 
                         match cmd.spawn() {

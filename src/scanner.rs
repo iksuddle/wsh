@@ -3,6 +3,8 @@ use std::{iter::Peekable, str::Chars};
 #[derive(Debug, PartialEq, Eq)]
 pub enum Token {
     Pipe,
+    Greater,
+    Less,
     Literal(String),
     Eof,
 }
@@ -25,6 +27,8 @@ impl<'a> Scanner<'a> {
             let token = match c {
                 ' ' | '\n' | '\t' => continue,
                 '|' => Token::Pipe,
+                '>' => Token::Greater,
+                '<' => Token::Less,
                 x => {
                     if !self.is_valid_literal_start(&x) {
                         return Err(format!("unexpected token: {x}"));
