@@ -1,10 +1,5 @@
 use serde::Deserialize;
-use std::{
-    error::Error,
-    fs::{OpenOptions, create_dir_all},
-    io::Read,
-    path::PathBuf,
-};
+use std::{error::Error, fs::OpenOptions, io::Read, path::PathBuf};
 
 #[derive(Deserialize)]
 pub struct Config {
@@ -21,29 +16,23 @@ impl Default for Config {
 
 impl Config {
     pub fn build(path: Option<PathBuf>) -> Result<Config, Box<dyn Error>> {
-        let path = match path {
-            Some(p) => p,
+        let config_path = match path {
+            Some(path) => path,
             None => {
-                let mut default_path = dirs::config_local_dir().unwrap();
-                default_path.push("wsh");
-                default_path.push("config.toml");
-                default_path
+                let xdg_dirs = xdg::BaseDirectories::with_prefix("wsh");
+                xdg_dirs.place_config_file("config.toml")?
             }
         };
 
-        if let Some(config_folder) = path.parent() {
-            create_dir_all(config_folder)?;
-        }
-
-        // println!("config file is: {:?}", path);
-        let mut file = OpenOptions::new()
+        let mut config_file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
-            .open(&path)?;
+            .truncate(false)
+            .open(&config_path)?;
 
         let mut config_data = String::new();
-        file.read_to_string(&mut config_data)?;
+        config_file.read_to_string(&mut config_data)?;
 
         Ok(toml::from_str(&config_data)?)
     }
