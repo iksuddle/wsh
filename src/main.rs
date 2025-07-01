@@ -5,7 +5,7 @@ use wsh::{Config, Shell};
 fn main() {
     // todo: parse --prompt $ from args
     let config = Config::build(None).unwrap_or_else(|err| {
-        println!("{}", err);
+        println!("{:?}", err);
         Config::default()
     });
 

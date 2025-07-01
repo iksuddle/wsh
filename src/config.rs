@@ -1,5 +1,27 @@
 use serde::Deserialize;
-use std::{error::Error, fs::OpenOptions, io::Read, path::PathBuf};
+use std::{
+    fs::OpenOptions,
+    io::{self, Read},
+    path::PathBuf,
+};
+
+#[derive(Debug)]
+pub enum ConfigError {
+    Io(io::Error),
+    Toml(toml::de::Error),
+}
+
+impl From<io::Error> for ConfigError {
+    fn from(value: io::Error) -> Self {
+        Self::Io(value)
+    }
+}
+
+impl From<toml::de::Error> for ConfigError {
+    fn from(value: toml::de::Error) -> Self {
+        Self::Toml(value)
+    }
+}
 
 #[derive(Deserialize)]
 pub struct Config {
@@ -13,9 +35,8 @@ impl Default for Config {
         }
     }
 }
-
 impl Config {
-    pub fn build(path: Option<PathBuf>) -> Result<Config, Box<dyn Error>> {
+    pub fn build(path: Option<PathBuf>) -> Result<Config, ConfigError> {
         let config_path = match path {
             Some(path) => path,
             None => {
