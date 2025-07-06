@@ -1,7 +1,6 @@
 use serde::Deserialize;
 use std::{
-    fs::OpenOptions,
-    io::{self, Read},
+    io::{self},
     path::PathBuf,
 };
 
@@ -45,15 +44,7 @@ impl Config {
             }
         };
 
-        let mut config_file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(false)
-            .open(&config_path)?;
-
-        let mut config_data = String::new();
-        config_file.read_to_string(&mut config_data)?;
+        let config_data = std::fs::read_to_string(config_path)?;
 
         Ok(toml::from_str(&config_data)?)
     }

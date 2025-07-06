@@ -129,20 +129,18 @@ pub mod builtins {
     use super::*;
 
     pub fn cd(args: &[String]) {
-        match args.len() {
-            1 => {
+        match args {
+            [_] => {
                 let home = env::var("HOME").expect("error: $HOME not set");
                 if let Err(e) = env::set_current_dir(home) {
                     println!("cd: operation failed: {}", e);
                 }
             }
-
-            2 => {
-                if let Err(e) = env::set_current_dir(&args[1]) {
+            [_, directory] => {
+                if let Err(e) = env::set_current_dir(directory) {
                     println!("cd: operation failed: {}", e);
                 }
             }
-
             _ => println!("cd: too many arguments"),
         };
     }
