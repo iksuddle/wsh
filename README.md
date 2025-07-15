@@ -32,7 +32,6 @@ $ echo $foo $hello
 bar world
 ```
 
-
 Pipe commands:
 ```
 cat Cargo.lock | grep "name"
@@ -43,3 +42,4 @@ Redirect IO:
 cat < input.txt | grep "foo" | wc -l > count.txt
 ```
 
+Run `help` command for more details.
