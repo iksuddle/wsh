@@ -4,22 +4,12 @@ use std::{
     path::PathBuf,
 };
 
-#[derive(Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum ConfigError {
-    Io(io::Error),
-    Toml(toml::de::Error),
-}
-
-impl From<io::Error> for ConfigError {
-    fn from(value: io::Error) -> Self {
-        Self::Io(value)
-    }
-}
-
-impl From<toml::de::Error> for ConfigError {
-    fn from(value: toml::de::Error) -> Self {
-        Self::Toml(value)
-    }
+    #[error("io error: {0}")]
+    Io(#[from] io::Error),
+    #[error("error reading toml file")]
+    Toml(#[from] toml::de::Error),
 }
 
 #[derive(Deserialize)]
@@ -34,6 +24,7 @@ impl Default for Config {
         }
     }
 }
+
 impl Config {
     pub fn build(path: Option<PathBuf>) -> Result<Config, ConfigError> {
         let config_path = match path {

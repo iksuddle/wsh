@@ -7,5 +7,6 @@ edition = "2024"
 nix = "0.30.1"
 rustyline = "16.0.0"
 serde = { version = "1.0.219", features = ["derive"] }
+thiserror = "2.0.12"
 toml = "0.8.23"
 xdg = "3.0.0"
