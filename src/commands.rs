@@ -11,6 +11,7 @@ pub enum CommandIO {
 #[derive(Debug)]
 pub enum Command {
     Exit,
+    Help,
     Cd(Vec<String>),
     Pwd(Vec<String>),
     SetVar(String, String),
@@ -32,6 +33,7 @@ impl Command {
             "pwd" => Command::Pwd(args),
             "lsv" => Command::ListVars,
             "get" => Command::GetVar(args),
+            "help" => Command::Help,
             _ => Command::External {
                 args,
                 input,
@@ -127,6 +129,24 @@ impl Command {
 
 pub mod builtins {
     use super::*;
+
+    pub fn help() {
+        let help_info = vec![
+            ("help", "shows this message"),
+            ("exit", "terminates the shell"),
+            ("cd [dir]", "change directory to [dir]"),
+            ("pwd", "print current working directory"),
+            ("lsv", "list all variables"),
+            ("get [var]", "print a variable [var]"),
+        ];
+
+        let max_width = help_info.iter().map(|info| info.0.len()).max().unwrap();
+
+        for info in help_info {
+            // + 2 for some additional padding
+            println!("{:>width$} - {}", info.0, info.1, width = max_width + 2);
+        }
+    }
 
     pub fn cd(args: &[String]) {
         match args {

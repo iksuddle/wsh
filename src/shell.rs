@@ -81,6 +81,7 @@ impl Shell {
                 Command::Exit => return Err(ExecError::Exit),
                 Command::Cd(args) => builtins::cd(args),
                 Command::Pwd(args) => builtins::pwd(args),
+                Command::Help => builtins::help(),
                 Command::SetVar(k, v) => {
                     self.env_vars.insert(k.to_owned(), v.to_owned());
                 }
