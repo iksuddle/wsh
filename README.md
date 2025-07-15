@@ -10,7 +10,19 @@ A small shell I am writing to learn Rust.
 - pipes: `cat Cargo.lock | grep "name"`
 - input/output redirection: `echo "hello world" > msg.txt`
 
-## Example
+## Configuration
+
+The configuration file is located at `$XDG_CONFIG_HOME/wsh/config.toml`.
+If `XDG_CONFIG_HOME` is not set, `$HOME/.config` is used instead.
+
+### Example
+```toml
+# ~/.config/wsh/config.toml
+
+prompt = "> "
+```
+
+## Usage
 
 Set and expand variables:
 ```
@@ -20,19 +32,6 @@ $ echo $foo $hello
 bar world
 ```
 
-List all variables using `lsv`:
-```
-$ lsv
-2 items:
-hello: world
-foo: bar
-```
-
-Get a the value of a variable using `get`:
-```
-$ get foo
-bar
-```
 
 Pipe commands:
 ```
@@ -43,3 +42,4 @@ Redirect IO:
 ```
 cat < input.txt | grep "foo" | wc -l > count.txt
 ```
+
