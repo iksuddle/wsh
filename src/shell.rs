@@ -11,6 +11,7 @@ use crate::{
     Config,
     commands::{Command, CommandIO, builtins},
     scanner::Scanner,
+    wish::{CmdGen, WishError},
 };
 
 enum ExecError {
@@ -19,10 +20,17 @@ enum ExecError {
     PermissionError,
 }
 
+enum ShellMode {
+    Normal,
+    Wish,
+}
+
 pub struct Shell {
     prompt: String,
     line_reader: DefaultEditor,
     env_vars: HashMap<String, String>,
+    cmd_gen: CmdGen,
+    mode: ShellMode,
 }
 
 impl Shell {
@@ -31,47 +39,121 @@ impl Shell {
             prompt: config.prompt,
             line_reader: DefaultEditor::new().expect("error creating line editor"),
             env_vars: HashMap::new(),
+            cmd_gen: CmdGen::new(),
+            mode: ShellMode::Normal,
         }
     }
 
-    pub fn run(&mut self) -> Result<(), io::Error> {
+    pub async fn run(&mut self) -> Result<(), io::Error> {
         loop {
-            let input = match self.line_reader.readline(&self.prompt) {
-                Ok(line) => line,
-                Err(ReadlineError::Interrupted) => continue,
-                Err(ReadlineError::Eof) => break,
-                Err(err) => {
-                    println!("error: {:?}", err);
-                    break;
+            match self.mode {
+                ShellMode::Normal => {
+                    let input = match self.line_reader.readline(&self.prompt) {
+                        Ok(line) => line,
+                        Err(ReadlineError::Interrupted) => continue,
+                        Err(ReadlineError::Eof) => break,
+                        Err(err) => {
+                            println!("error: {:?}", err);
+                            break;
+                        }
+                    };
+
+                    let input = self.expand(&input);
+
+                    let mut scanner = Scanner::new(input.as_str());
+
+                    let tokens = match scanner.scan_tokens() {
+                        Ok(tokens) => tokens,
+                        Err(e) => {
+                            println!("{}", e);
+                            continue;
+                        }
+                    };
+
+                    let cmds = Command::process_input(tokens);
+
+                    match self.execute(cmds).await {
+                        Err(ExecError::Exit) => break,
+                        Err(ExecError::PermissionError) => println!("permission denied"),
+                        Err(ExecError::CommandNotFound(cmd)) => {
+                            println!("command not found: {cmd}")
+                        }
+                        _ => (),
+                    };
                 }
-            };
+                ShellMode::Wish => {
+                    let input = match self.line_reader.readline(">> ") {
+                        Ok(line) => line,
+                        Err(err) => {
+                            println!("error: {:?}", err);
+                            self.mode = ShellMode::Normal;
+                            continue;
+                        }
+                    };
 
-            let input = self.expand(&input);
+                    if input.trim() == "exit" {
+                        self.mode = ShellMode::Normal;
+                        continue;
+                    }
 
-            let mut scanner = Scanner::new(input.as_str());
+                    println!("generating commands...");
 
-            let tokens = match scanner.scan_tokens() {
-                Ok(tokens) => tokens,
-                Err(e) => {
-                    println!("{}", e);
-                    continue;
+                    let res = self.cmd_gen.generate_commands(input).await;
+                    match res {
+                        Ok(commands) => {
+                            self.request_commands_execution(commands).await;
+                        }
+                        Err(WishError::Gemini(e)) => println!("{e}"),
+                        Err(e) => println!("{e}"),
+                    }
                 }
-            };
-
-            let cmds = Command::process_input(tokens);
-
-            match self.execute(cmds) {
-                Err(ExecError::Exit) => break,
-                Err(ExecError::CommandNotFound(cmd)) => println!("command not found: {cmd}"),
-                Err(ExecError::PermissionError) => println!("permission denied"),
-                _ => (),
             }
         }
-
         Ok(())
     }
 
-    fn execute(&mut self, cmds: Vec<Command>) -> Result<(), ExecError> {
+    async fn request_commands_execution(&mut self, commands: Vec<String>) {
+        for c in commands {
+            println!("\n-> {c}");
+            let decision = match self.line_reader.readline("Execute? [y/N] ") {
+                Ok(decision) => decision,
+                Err(_) => {
+                    println!("stopping execution");
+                    break;
+                }
+            };
+            println!();
+            match decision.to_lowercase().as_str() {
+                "y" | "yes" => {
+                    let mut scanner = Scanner::new(c.as_str());
+
+                    let tokens = match scanner.scan_tokens() {
+                        Ok(tokens) => tokens,
+                        Err(e) => {
+                            println!("{}", e);
+                            continue;
+                        }
+                    };
+
+                    let cmds = Command::process_input(tokens);
+
+                    match self.execute(cmds).await {
+                        Err(ExecError::Exit) => break,
+                        Err(ExecError::CommandNotFound(cmd)) => {
+                            println!("command not found: {cmd}")
+                        }
+
+                        Err(ExecError::PermissionError) => println!("permission denied"),
+                        _ => (),
+                    }
+                }
+                // not yes, break
+                _ => break,
+            };
+        }
+    }
+
+    async fn execute(&mut self, cmds: Vec<Command>) -> Result<(), ExecError> {
         let mut prev_stdout: Option<ChildStdout> = None;
         let mut children = Vec::new();
 
@@ -87,6 +169,10 @@ impl Shell {
                 }
                 Command::GetVar(args) => self.bn_get(args),
                 Command::ListVars => self.bn_lsv(),
+                Command::Wish => {
+                    println!("entering wish mode...");
+                    self.mode = ShellMode::Wish;
+                }
                 Command::External {
                     args,
                     input,

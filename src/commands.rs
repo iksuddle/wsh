@@ -22,6 +22,7 @@ pub enum Command {
         input: CommandIO,
         output: CommandIO,
     },
+    Wish,
     Error(String),
 }
 
@@ -34,6 +35,7 @@ impl Command {
             "lsv" => Command::ListVars,
             "get" => Command::GetVar(args),
             "help" => Command::Help,
+            "wish" => Command::Wish,
             _ => Command::External {
                 args,
                 input,
