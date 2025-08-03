@@ -224,7 +224,7 @@ impl Shell {
                         println!(
                             "command {} exited with status {:?}",
                             child.id(),
-                            status.code().unwrap()
+                            status.code().unwrap_or_default()
                         );
                     }
                 }

@@ -136,6 +136,7 @@ pub mod builtins {
         let help_info = vec![
             ("help", "shows this message"),
             ("exit", "terminates the shell"),
+            ("wish", "enters wish mode"),
             ("cd [dir]", "change directory to [dir]"),
             ("pwd", "print current working directory"),
             ("lsv", "list all variables"),

@@ -2,7 +2,10 @@
 
 A small shell I am writing to learn Rust.
 
+[![asciicast](https://asciinema.org/a/JJrOFRsXuDTrESDG1KLgFTc2n.svg)](https://asciinema.org/a/JJrOFRsXuDTrESDG1KLgFTc2n)
+
 ## Features
+- Natural language support!
 - builtins (`cd`, `pwd`, `lsv`, etc.)
 - run programs from path
 - set variables: `foo=bar`
@@ -23,6 +26,13 @@ prompt = "> "
 ```
 
 ## Usage
+
+To use the shell via natural language, enter `wish` mode:
+```
+$ wish
+entering wish mode...
+>> 
+```
 
 Set and expand variables:
 ```
