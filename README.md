@@ -2,7 +2,7 @@
 
 A small shell I am writing to learn Rust.
 
-[![asciicast](https://asciinema.org/a/JJrOFRsXuDTrESDG1KLgFTc2n.svg)](https://asciinema.org/a/JJrOFRsXuDTrESDG1KLgFTc2n)
+[![asciicast](https://asciinema.org/a/BaXmNOykNa5faW3aPafz1Ad5p.svg)](https://asciinema.org/a/BaXmNOykNa5faW3aPafz1Ad5p)
 
 ## Features
 - Natural language support!
