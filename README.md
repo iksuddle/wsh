@@ -1,11 +1,11 @@
 # `wsh`
 
-A small shell I am writing to learn Rust.
+A simple shell that speaks your language.
 
 [![asciicast](https://asciinema.org/a/BaXmNOykNa5faW3aPafz1Ad5p.svg)](https://asciinema.org/a/BaXmNOykNa5faW3aPafz1Ad5p)
 
 ## Features
-- Natural language support!
+- natural language support!
 - builtins (`cd`, `pwd`, `lsv`, etc.)
 - run programs from path
 - set variables: `foo=bar`
